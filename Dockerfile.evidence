@@ -1,0 +1,3 @@
+FROM scratch
+COPY evidence/evidence-bundle.tar /evidence-bundle.tar
+
