@@ -5,7 +5,7 @@ steps:
     env:
       - FIXTURE_PROVIDER=google-cloud-build
     args:
-      - -ceu
+      - -eu
       - ./scripts/run_nix_matrix.sh
 
   - id: verify-and-package-evidence
@@ -35,4 +35,3 @@ options:
   defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET
 
 timeout: 900s
-
