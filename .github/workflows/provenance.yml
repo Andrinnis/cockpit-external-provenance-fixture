@@ -23,7 +23,7 @@ jobs:
             --workdir /workspace \
             --env FIXTURE_PROVIDER=github-actions \
             nixos/nix@sha256:377d4887aca98f0dfa12971c1ea6d6a625a435d8b610d4c95a436843da6fbfd1 \
-            sh -ceu './scripts/run_nix_matrix.sh'
+            sh -eu ./scripts/run_nix_matrix.sh
 
       - name: Verify and package exact evidence
         run: |
@@ -45,4 +45,3 @@ jobs:
         uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763
         with:
           subject-path: evidence/evidence-bundle.tar
-
