@@ -15,13 +15,46 @@ HOLD_UNDECLARED_INPUT = "HOLD_UNDECLARED_INPUT"
 VERIFIABLE_PASS = "VERIFIABLE_PASS"
 
 
-def canonical_nodes(raw: dict) -> dict[str, dict[str, list[str]]]:
-    nodes = {}
-    for drv, body in raw.items():
-        nodes[drv] = {
-            "inputDrvs": sorted(body.get("inputDrvs", {}).keys()),
-            "inputSrcs": sorted(body.get("inputSrcs", [])),
-        }
+def canonical_nodes(*raw_documents: dict) -> dict[str, dict[str, list[str]]]:
+    if not raw_documents:
+        raise ValueError("at least one Nix derivation document is required")
+
+    nodes: dict[str, dict[str, list[str]]] = {}
+    for document in raw_documents:
+        if not isinstance(document, dict) or set(document) != {"version", "derivations"}:
+            raise ValueError("expected exact Nix derivation JSON v4 wrapper")
+        if type(document["version"]) is not int or document["version"] != 4:
+            raise ValueError("expected Nix derivation JSON version 4")
+
+        derivations = document["derivations"]
+        if not isinstance(derivations, dict):
+            raise ValueError("Nix v4 derivations must be an object")
+
+        for drv, body in derivations.items():
+            if not isinstance(drv, str) or not isinstance(body, dict):
+                raise ValueError("Nix v4 derivation entries must map string paths to objects")
+            inputs = body.get("inputs")
+            if not isinstance(inputs, dict) or set(inputs) != {"drvs", "srcs"}:
+                raise ValueError(f"invalid Nix v4 inputs for {drv}")
+            input_drvs = inputs["drvs"]
+            input_srcs = inputs["srcs"]
+            if not isinstance(input_drvs, dict) or not isinstance(input_srcs, list):
+                raise ValueError(f"invalid Nix v4 input collections for {drv}")
+            if any(not isinstance(path, str) for path in input_drvs):
+                raise ValueError(f"non-string input derivation path for {drv}")
+            if any(not isinstance(metadata, dict) for metadata in input_drvs.values()):
+                raise ValueError(f"invalid input derivation metadata for {drv}")
+            if any(not isinstance(path, str) for path in input_srcs):
+                raise ValueError(f"non-string input source path for {drv}")
+
+            node = {
+                "inputDrvs": sorted(input_drvs),
+                "inputSrcs": sorted(input_srcs),
+            }
+            if drv in nodes and nodes[drv] != node:
+                raise ValueError(f"conflicting duplicate derivation: {drv}")
+            nodes[drv] = node
+
     return dict(sorted(nodes.items()))
 
 
@@ -95,10 +128,10 @@ def main() -> int:
     neutral_nodes = canonical_nodes(load_raw(base, "neutral"))
     neutral_set = closure(neutral_nodes, root_for(base, "neutral"))
 
-    positive_observed = canonical_nodes({
-        **load_raw(base, "pair"),
-        **load_raw(base, "oracle"),
-    })
+    positive_observed = canonical_nodes(
+        load_raw(base, "pair"),
+        load_raw(base, "oracle"),
+    )
     positive_submitted = json.loads(json.dumps(positive_observed))
     positive = decide(
         positive_observed,
@@ -108,10 +141,10 @@ def main() -> int:
         neutral_set,
     )
 
-    shared_observed = canonical_nodes({
-        **load_raw(base, "pair-shared"),
-        **load_raw(base, "oracle-shared"),
-    })
+    shared_observed = canonical_nodes(
+        load_raw(base, "pair-shared"),
+        load_raw(base, "oracle-shared"),
+    )
     shared_submitted = json.loads(json.dumps(shared_observed))
     shared = decide(
         shared_observed,
