@@ -87,6 +87,10 @@ def main() -> int:
     base = Path(sys.argv[1] if len(sys.argv) > 1 else "evidence")
     if (base / "sandbox-config.txt").read_text().strip().split()[-1].lower() not in {"true", "relaxed"}:
         raise SystemExit("sandbox was not enabled")
+    if (base / "sandbox-fallback-config.txt").read_text().strip().split()[-1].lower() != "false":
+        raise SystemExit("sandbox fallback was not disabled")
+    if (base / "nix-version.txt").read_text().strip() != "nix (Nix) 2.35.1":
+        raise SystemExit("unexpected Nix version")
 
     neutral_nodes = canonical_nodes(load_raw(base, "neutral"))
     neutral_set = closure(neutral_nodes, root_for(base, "neutral"))
@@ -176,4 +180,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

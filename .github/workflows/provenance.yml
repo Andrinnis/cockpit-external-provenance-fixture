@@ -16,23 +16,42 @@ jobs:
       - name: Checkout exact source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
+      - name: Acquire exact upstream Nix installer
+        env:
+          NIX_INSTALLER_VERSION: "2.35.1"
+          NIX_INSTALLER_SHA256: "3b49a0b91820accb76e3d9ff7ed64fc430121b9fafb3869b0d549721fbeb4c85"
+        run: |
+          set -eu
+          installer_dir="${RUNNER_TEMP}/cockpit-nix-installer"
+          installer="${installer_dir}/nix-installer-x86_64-linux"
+          mkdir -p "$installer_dir"
+          curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \
+            --output "$installer" \
+            "https://github.com/NixOS/nix-installer/releases/download/${NIX_INSTALLER_VERSION}/nix-installer-x86_64-linux"
+          printf '%s  %s\n' "$NIX_INSTALLER_SHA256" "$installer" | sha256sum --check --strict -
+          chmod 0755 "$installer"
+          printf 'NIX_INSTALLER=%s\n' "$installer" >> "$GITHUB_ENV"
+          printf 'NIX_INSTALLER_SHA256=%s\n' "$NIX_INSTALLER_SHA256" >> "$GITHUB_ENV"
+
+      - name: Install exact Nix directly on runner
+        run: |
+          set -eu
+          sudo "$NIX_INSTALLER" install linux \
+            --no-confirm \
+            --enable-flakes \
+            --extra-conf $'sandbox = true\nsandbox-fallback = false\nrequire-sigs = true'
+          /nix/var/nix/profiles/default/bin/nix --version
+          printf '%s\n' '/nix/var/nix/profiles/default/bin' >> "$GITHUB_PATH"
+
       - name: Execute Nix closure matrix
         run: |
-          docker run --rm \
-            --volume "$PWD:/workspace" \
-            --workdir /workspace \
-            --env FIXTURE_PROVIDER=github-actions \
-            nixos/nix@sha256:377d4887aca98f0dfa12971c1ea6d6a625a435d8b610d4c95a436843da6fbfd1 \
-            sh -eu ./scripts/run_nix_matrix.sh
+          FIXTURE_PROVIDER=github-actions \
+          FIXTURE_SOURCE_COMMIT="$GITHUB_SHA" \
+          sh -eu ./scripts/run_nix_matrix.sh
 
       - name: Verify and package exact evidence
         run: |
-          docker run --rm \
-            --volume "$PWD:/workspace" \
-            --workdir /workspace \
-            --env FIXTURE_PROVIDER=github-actions \
-            python@sha256:5f55cdf0c5d9dc1a415637a5ccc4a9e18663ad203673173b8cda8f8dcacef689 \
-            python3 scripts/verify_matrix.py evidence
+          FIXTURE_PROVIDER=github-actions python3 scripts/verify_matrix.py evidence
 
       - name: Upload exact evidence bytes
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

@@ -6,8 +6,9 @@
   outputs = { self }:
     let
       system = "x86_64-linux";
+      busyboxSource = /nix/store/yysvxw5iwwijaci7ggrnms4mavwcjnpk-busybox-1.37.0/bin/busybox;
       busybox = builtins.path {
-        path = /bin/busybox;
+        path = busyboxSource;
         name = "fixture-busybox";
       };
       builderScript = builtins.toFile "fixture-builder.sh" ''
@@ -56,4 +57,3 @@
       };
     };
 }
-
