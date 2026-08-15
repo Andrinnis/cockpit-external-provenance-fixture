@@ -1,0 +1,48 @@
+name: external-provenance-fixture
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
+jobs:
+  build-and-attest:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Execute Nix closure matrix
+        run: |
+          docker run --rm \
+            --volume "$PWD:/workspace" \
+            --workdir /workspace \
+            --env FIXTURE_PROVIDER=github-actions \
+            nixos/nix@sha256:377d4887aca98f0dfa12971c1ea6d6a625a435d8b610d4c95a436843da6fbfd1 \
+            sh -ceu './scripts/run_nix_matrix.sh'
+
+      - name: Verify and package exact evidence
+        run: |
+          docker run --rm \
+            --volume "$PWD:/workspace" \
+            --workdir /workspace \
+            --env FIXTURE_PROVIDER=github-actions \
+            python@sha256:5f55cdf0c5d9dc1a415637a5ccc4a9e18663ad203673173b8cda8f8dcacef689 \
+            python3 scripts/verify_matrix.py evidence
+
+      - name: Upload exact evidence bytes
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: external-provenance-evidence
+          path: evidence/evidence-bundle.tar
+          if-no-files-found: error
+
+      - name: Sign GitHub build provenance
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763
+        with:
+          subject-path: evidence/evidence-bundle.tar
+
