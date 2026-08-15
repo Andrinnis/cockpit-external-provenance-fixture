@@ -1,0 +1,38 @@
+steps:
+  - id: execute-nix-closure-matrix
+    name: nixos/nix@sha256:377d4887aca98f0dfa12971c1ea6d6a625a435d8b610d4c95a436843da6fbfd1
+    entrypoint: sh
+    env:
+      - FIXTURE_PROVIDER=google-cloud-build
+    args:
+      - -ceu
+      - ./scripts/run_nix_matrix.sh
+
+  - id: verify-and-package-evidence
+    name: python@sha256:5f55cdf0c5d9dc1a415637a5ccc4a9e18663ad203673173b8cda8f8dcacef689
+    entrypoint: python3
+    env:
+      - FIXTURE_PROVIDER=google-cloud-build
+    args:
+      - scripts/verify_matrix.py
+      - evidence
+
+  - id: build-evidence-image
+    name: gcr.io/cloud-builders/docker@sha256:661e95acd923514f71f47ce7b390e06a8d31b15febecf772e506babf62960528
+    args:
+      - build
+      - --file
+      - Dockerfile.evidence
+      - --tag
+      - europe-west4-docker.pkg.dev/$PROJECT_ID/provenance-fixture/evidence:v1
+      - .
+
+images:
+  - europe-west4-docker.pkg.dev/$PROJECT_ID/provenance-fixture/evidence:v1
+
+options:
+  requestedVerifyOption: VERIFIED
+  defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET
+
+timeout: 900s
+
